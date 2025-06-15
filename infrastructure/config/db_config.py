@@ -4,4 +4,4 @@ DB_CONFIG = {
     'password': 'Agu_!123',
     'database': 'inventario',
     'port': '3306'
-}
+} 
