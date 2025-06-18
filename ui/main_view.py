@@ -2,6 +2,10 @@ import tkinter as tk
 from tkinter import font
 from PIL import Image, ImageTk
 import os
+import sys
+import io
+
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 from infrastructure.config.colores import (
     COLOR_BARRA_SUPERIOR,
