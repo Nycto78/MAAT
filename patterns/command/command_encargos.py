@@ -208,4 +208,3 @@ class EliminarEncargoCommand(Command):
                 if 'cursor' in locals():
                     cursor.close()
         return False
-    

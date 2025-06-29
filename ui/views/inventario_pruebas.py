@@ -3,6 +3,11 @@ from tkinter import ttk
 import mysql.connector
 from patterns.observer.observer_base import ObservableBase
 from infrastructure.config.database import DatabaseConnector
+import uuid # Para generar IDs únicos
+from patterns.strategy.pricing_strategy import PricingStrategy
+from patterns.strategy.iva_strategy import IVAStrategy
+from patterns.strategy.discount_strategy import DiscountStrategy
+from domain.entities.producto import Producto
 
 def conectar_db():
     return mysql.connector.connect(
@@ -13,22 +18,18 @@ def conectar_db():
         port= '3306'
     )
 
-
-
-
 class FormularioInventario(ObservableBase):  # <- hereda directamente
+    """Clase que representa el formulario de inventario, hereda de ObservableBase para notificar cambios."""
     def __init__(self, panel_principal):
-        super().__init__()  # Inicializa lista de observers
-
+        super().__init__()   # Inicializa lista de observers
         self.panel = panel_principal
         self.ultima_accion = None
-
         self.estilizar()
         self.crear_buscador()
         self.crear_tabla_componentes()
         self.crear_botones_accion()
         self.cargar_datos()
-
+        self.notificar()  # Notifica al inicio para mostrar stock bajo
 
     def estilizar(self):
         style = ttk.Style()
@@ -45,7 +46,7 @@ class FormularioInventario(ObservableBase):  # <- hereda directamente
         self.entry_busqueda.pack(side=tk.LEFT, padx=5)
 
         btn_buscar = tk.Button(frame_busqueda, text="Aplicar", command=self.aplicar_filtro,
-                               bg="#4CAF50", fg="white", font=("Roboto", 10, "bold"))
+            bg="#4CAF50", fg="white", font=("Roboto", 10, "bold"))
         btn_buscar.pack(side=tk.LEFT, padx=5)
 
     def crear_tabla_componentes(self):
@@ -76,9 +77,7 @@ class FormularioInventario(ObservableBase):  # <- hereda directamente
         datos = cursor.fetchall()
         conn.close()
 
- 
         return datos
-
 
     def notificar(self):
         data = self.obtener_datos_mysql()
@@ -87,8 +86,6 @@ class FormularioInventario(ObservableBase):  # <- hereda directamente
             cantidad = producto[3]
             if cantidad < 30:
                 self.notify(f"Stock bajo: {nombre} (cantidad: {cantidad})")
-
-        
         
     def cargar_datos(self, filtro=""):
         datos = self.obtener_datos_mysql(filtro)
@@ -107,22 +104,24 @@ class FormularioInventario(ObservableBase):  # <- hereda directamente
 
         # Botón Agregar
         btn_agregar = tk.Button(frame_botones, text="Agregar producto", bg="green", fg="white",
-                                command=self.abrir_ventana_agregar)
+            command=self.abrir_ventana_agregar)
         btn_agregar.pack(side=tk.LEFT, padx=5)
 
         # Botón Quitar
         btn_quitar = tk.Button(frame_botones, text="Quitar producto", bg="red", fg="white",
-                            command=self.quitar_producto)
+            command=self.quitar_producto)
         btn_quitar.pack(side=tk.LEFT, padx=5)
 
         # Botón Deshacer
         btn_deshacer = tk.Button(frame_botones, text="Deshacer", bg="#FF9800", fg="white",
-                                command=self.deshacer_ultima_accion)
+            command=self.deshacer_ultima_accion)
         btn_deshacer.pack(side=tk.LEFT, padx=5)
+        
     def abrir_ventana_agregar(self):
         ventana = tk.Toplevel(self.panel)
         ventana.title("Agregar nuevo producto")
 
+        # Define labels y entradas primero (Error 9 y Errores 2-3)
         labels = ["Nombre", "Categoria", "Cantidad", "Precio"]
         entradas = {}
 
@@ -132,42 +131,64 @@ class FormularioInventario(ObservableBase):  # <- hereda directamente
             entrada.grid(row=i, column=1, padx=10, pady=5)
             entradas[label] = entrada
 
+        # Selector de estrategia de precios
+        ttk.Label(ventana, text="Tipo de precio:").grid(row=4, column=0, padx=10, pady=5)
+        estrategia_var = tk.StringVar(value="iva")
+        ttk.Radiobutton(ventana, text="Con IVA (21%)", variable=estrategia_var, value="iva").grid(row=4, column=1, sticky="w")
+        ttk.Radiobutton(ventana, text="Con Descuento (10%)", variable=estrategia_var, value="descuento").grid(row=5, column=1, sticky="w")
+
         def confirmar():
             try:
                 nombre = entradas["Nombre"].get()
                 categoria = entradas["Categoria"].get()
                 cantidad = int(entradas["Cantidad"].get())
-                precio = float(entradas["Precio"].get())
-
+                precio_base = float(entradas["Precio"].get())
+                
+                # Configura la estrategia de precio
+                if estrategia_var.get() == "iva":
+                    from patterns.strategy.iva_strategy import IVAStrategy
+                    estrategia = IVAStrategy()
+                else:
+                    from patterns.strategy.discount_strategy import DiscountStrategy
+                    estrategia = DiscountStrategy(10)  # 10% de descuento
+                
+                # Calcula el precio final
+                precio_final = estrategia.calcular_precio(precio_base)
+                
+                # Inserta en la base de datos (sin especificar ID)
                 conn = DatabaseConnector.get_connection()
-
                 cursor = conn.cursor()
                 cursor.execute("""
                     INSERT INTO productos (nombre, categoria, cantidad, precio)
                     VALUES (%s, %s, %s, %s)
-                """, (nombre, categoria, cantidad, precio))
+                """, (nombre, categoria, cantidad, precio_final))
                 conn.commit()
-
-                # Guardar acción para deshacer
-                self.ultima_accion = ("agregar", cursor.lastrowid)
-
-                conn.close()
+                
+                # Obtiene el ID generado automáticamente
+                nuevo_id = cursor.lastrowid
+                print(f"Producto agregado con ID: {nuevo_id}")
+                
                 self.cargar_datos()
                 ventana.destroy()
+                
             except Exception as e:
                 tk.messagebox.showerror("Error", f"No se pudo agregar el producto:\n{e}")
+            finally:
+                if 'conn' in locals() and conn.is_connected():
+                    cursor.close()
+                    conn.close()
 
         btn = tk.Button(ventana, text="Agregar", command=confirmar, bg="#4CAF50", fg="white")
-        btn.grid(row=len(labels), column=0, columnspan=2, pady=10)
+        btn.grid(row=6, column=0, columnspan=2, pady=10)
 
     def quitar_producto(self):
-        item = self.tabla.selection()
-        if not item:
-            tk.messagebox.showwarning("Advertencia", "Selecciona un producto para eliminar.")
+        item_seleccionado = self.tabla.selection()
+        if not item_seleccionado:
             return
 
-        producto = self.tabla.item(item)["values"]
-        producto_id = producto[0]
+        producto = self.tabla.item(item_seleccionado)["values"]
+        producto_id = producto[0] 
+        
 
         respuesta = tk.messagebox.askyesno("Confirmar", f"¿Eliminar producto ID {producto_id}?")
         if respuesta:
@@ -182,6 +203,7 @@ class FormularioInventario(ObservableBase):  # <- hereda directamente
 
             conn.close()
             self.cargar_datos()
+            
     def deshacer_ultima_accion(self):
         if not self.ultima_accion:
             tk.messagebox.showinfo("Deshacer", "No hay acción para deshacer.")

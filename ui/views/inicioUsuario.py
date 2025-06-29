@@ -79,15 +79,15 @@ class VentanaLogin(ctk.CTk):
         ctk.CTkLabel(contenedor, text="Inicia sesión", font=ctk.CTkFont(size=16)).pack(pady=(0, 10))
 
         self.campo_email = ctk.CTkEntry(contenedor, placeholder_text="Correo electrónico",
-                                        fg_color="#f7e7a9", text_color="black", placeholder_text_color="grey20")
+        fg_color="#f7e7a9", text_color="black", placeholder_text_color="grey20")
         self.campo_email.pack(pady=10, padx=20)
 
         self.campo_password = ctk.CTkEntry(contenedor, placeholder_text="Contraseña", show="*",
-                                           fg_color="#f7e7a9", text_color="black", placeholder_text_color="grey20")
+        fg_color="#f7e7a9", text_color="black", placeholder_text_color="grey20")
         self.campo_password.pack(pady=10, padx=20)
 
         ctk.CTkButton(contenedor, text="Entrar", command=self.ejecutar_login,
-                      fg_color="#f57c00", hover_color="#fb8c00", text_color="white").pack(pady=10, padx=20)
+        fg_color="#f57c00", hover_color="#fb8c00", text_color="white").pack(pady=10, padx=20)
 
         ctk.CTkLabel(contenedor, text="¿Olvidaste tu contraseña?", font=ctk.CTkFont(size=12)).pack(pady=(0, 20))
 

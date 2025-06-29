@@ -14,6 +14,10 @@ from infrastructure.config.colores import (
     COLOR_MENU_CURSOR_ENCIMA
 )
 
+def get_inventario_form():
+    from ui.views.inventario_pruebas import FormularioInventario
+    return FormularioInventario
+
 from ui.utils.util_ventana import centrar_ventana as util_ventana
 from ui.assets import util_imagenes as util_img
 from ui.views.form_graficas import Formulario_graficas
