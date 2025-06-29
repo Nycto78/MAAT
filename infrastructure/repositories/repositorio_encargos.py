@@ -1,4 +1,3 @@
-
 from infrastructure.config.database import DatabaseConnector
 
 def obtener_todos_encargos():
@@ -12,7 +11,7 @@ def obtener_todos_encargos():
         resultados = cursor.fetchall()
         return resultados
     except Exception as e:
-        print(f"❌ Error al obtener encargos: {e}")
+        print(f" Error al obtener encargos: {e}")
         return []
     finally:
         cursor.close()

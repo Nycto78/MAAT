@@ -75,11 +75,11 @@ class FormularioMaestroDesign(tk.Tk):
         font_awesome = font.Font(family='FontAwesome', size=12)
 
         self.buttonMenuLateral = tk.Button(self.barra_superior, text="\uf0c9", font=font_awesome,
-                                           command=self.toggle_panel, bd=0, bg=COLOR_BARRA_SUPERIOR, fg="white")
+        command=self.toggle_panel, bd=0, bg=COLOR_BARRA_SUPERIOR, fg="white")
         self.buttonMenuLateral.pack(side=tk.LEFT)
 
         self.labelTitulo = tk.Label(self.barra_superior, text="amonsalve@gmail.com", fg="#fff",
-                                    font=("Roboto", 10), bg=COLOR_BARRA_SUPERIOR, padx=10, width=20)
+        font=("Roboto", 10), bg=COLOR_BARRA_SUPERIOR, padx=10, width=20)
         self.labelTitulo.pack(side=tk.RIGHT)
 
     def controles_menu_lateral(self):
@@ -106,7 +106,7 @@ class FormularioMaestroDesign(tk.Tk):
 
     def configurar_boton_menu(self, button, text, icon, font_awesome, ancho_menu, alto_menu, comando):
         button.config(text=f"  {icon}    {text}", anchor="w", font=font_awesome,
-                      bd=0, bg=COLOR_MENU_LATERAL, fg="white", width=ancho_menu, height=alto_menu, command=comando)
+        bd=0, bg=COLOR_MENU_LATERAL, fg="white", width=ancho_menu, height=alto_menu, command=comando)
         button.pack(side=tk.TOP)
         self.bind_hover_events(button)
 
