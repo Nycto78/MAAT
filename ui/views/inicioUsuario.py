@@ -14,8 +14,8 @@ from PIL import Image, ImageTk
 from ui.assets.util_imagenes import leer_imagen
 
 
-usuario_mailtrap = '9f453e283c7f28'
-clave_mailtrap = '464fcc2ab6eb18'
+usuario_mailtrap = '02c5d9a1b22d6b'
+clave_mailtrap = 'e354b8255143ee'
 servidor_smtp = 'sandbox.smtp.mailtrap.io'
 puerto_smtp = 2525
 

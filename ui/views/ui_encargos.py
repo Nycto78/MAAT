@@ -4,7 +4,7 @@ from datetime import datetime
 import mysql.connector
 from mysql.connector import Error
 from infrastructure.config.database import DatabaseConnector
-from infrastructure.repositories.repositorio_encargos import obtener_todos_encargos
+from infrastructure.repositories.repositorio_encargos import obtener_todos_encargos, guardar_encargo
 from patterns.command.command_manager import CommandManager
 from patterns.command.command_encargos import (
     GuardarEncargoCommand,
@@ -16,13 +16,14 @@ from patterns.command.command_encargos import (
 class InterfazEncargos(ttk.Frame):
     def __init__(self, parent):
         super().__init__(parent)
+        self.parent = parent
         self.pack(fill="both", expand=True)
-        self.conexion = DatabaseConnector.get_connection()
         self.entries = {}
-        self.command_manager = CommandManager()
+        self.encargo_seleccionado_id = None
         self.configurar_interfaz()
         self.crear_widgets()
         self.cargar_encargos()
+    
 
     def conectar_db(self):
         try:
@@ -101,12 +102,12 @@ class InterfazEncargos(ttk.Frame):
         frame_form.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
         campos = [
-            ("Nombre Conductor:", "nombre_conductor"),
-            ("Apellido Conductor:", "apellido_conductor"),
-            ("Patente:", "patente"),
-            ("Fecha Reparto (YYYY-MM-DD):", "fecha_reparto"),
-            ("Producto:", "producto"),
-            ("Cantidad:", "cantidad")
+        ("Nombre Conductor:", "nombre_conductor"),
+        ("Apellido Conductor:", "apellido_conductor"),
+        ("Patente:", "patente"),
+        ("Fecha Reparto (YYYY-MM-DD):", "fecha_reparto"),
+        ("Producto:", "producto"),
+        ("Cantidad:", "cantidad")
         ]
 
         for i, (texto, nombre) in enumerate(campos):
@@ -147,173 +148,267 @@ class InterfazEncargos(ttk.Frame):
 
     # Métodos CRUD implementados
     def guardar_encargo(self):
+        """Guarda un nuevo encargo"""
         try:
-            # Obtener datos de los campos de entrada
-            datos = {
-                'nombre_conductor': self.entries['nombre_conductor'].get().strip(),
-                'apellido_conductor': self.entries['apellido_conductor'].get().strip(),
-                'patente': self.entries['patente'].get().strip().upper(),
-                'fecha_reparto': self.entries['fecha_reparto'].get().strip(),
-                'producto': self.entries['producto'].get().strip(),
-                'cantidad': self.entries['cantidad'].get().strip(),
-                'repartiendo': self.repartiendo_var.get()
-            }
-
-            # Validar campos obligatorios
-            campos_obligatorios = ['nombre_conductor', 'apellido_conductor', 'patente', 'producto']
-            for campo in campos_obligatorios:
-                if not datos[campo]:
-                    messagebox.showwarning("Advertencia", f"El campo {campo.replace('_', ' ')} es obligatorio")
-                    return
-
-            # Validar formato de fecha
+            # Validar campos
+            campos_requeridos = ['nombre_conductor', 'apellido_conductor', 
+                                'patente', 'fecha_reparto', 'producto', 'cantidad']
+            for campo in campos_requeridos:
+                if not self.entries[campo].get().strip():
+                    raise ValueError(f"El campo {campo.replace('_', ' ')} es requerido")
+            
+            # Validar fecha
             try:
-                datetime.strptime(datos['fecha_reparto'], '%Y-%m-%d')
+                datetime.strptime(self.entries['fecha_reparto'].get(), '%Y-%m-%d')
             except ValueError:
-                messagebox.showwarning("Advertencia", "Formato de fecha inválido. Use YYYY-MM-DD")
-                return
-
+                raise ValueError("Formato de fecha inválido. Use YYYY-MM-DD")
+            
             # Validar cantidad
             try:
-                cantidad = int(datos['cantidad'])
+                cantidad = int(self.entries['cantidad'].get())
                 if cantidad <= 0:
                     raise ValueError
             except ValueError:
-                messagebox.showwarning("Advertencia", "La cantidad debe ser un número entero positivo")
-                return
-
-            # Crear y ejecutar comando para guardar
-            command = GuardarEncargoCommand(self.conexion, datos)
-            self.command_manager.execute(command)
+                raise ValueError("La cantidad debe ser un número entero positivo")
             
-            # Mostrar mensaje de éxito y actualizar lista
-            messagebox.showinfo("Éxito", "Encargo guardado correctamente")
-            self.limpiar_campos()
-            self.cargar_encargos()
+            # Preparar datos
+            datos = {
+                'nombre_conductor': self.entries['nombre_conductor'].get(),
+                'apellido_conductor': self.entries['apellido_conductor'].get(),
+                'patente': self.entries['patente'].get().upper(),
+                'fecha_reparto': self.entries['fecha_reparto'].get(),
+                'producto': self.entries['producto'].get(),
+                'cantidad': cantidad,
+                'repartiendo': self.repartiendo_var.get()
+            }
             
+            # Guardar en la base de datos
+            if guardar_encargo(datos):
+                messagebox.showinfo("Éxito", "Encargo guardado correctamente")
+                self.limpiar_campos()
+                self.cargar_encargos()  # Actualizar tabla
+            else:
+                messagebox.showerror("Error", "No se pudo guardar el encargo")
+                
+        except ValueError as ve:
+            messagebox.showwarning("Validación", str(ve))
         except Exception as e:
-            messagebox.showerror("Error", f"Error al guardar el encargo: {str(e)}")
-
+            messagebox.showerror("Error", f"Error al guardar:\n{str(e)}")
+            
     def actualizar_encargo(self):
+        """Actualiza el encargo seleccionado"""
         try:
-            seleccionado = self.tree.focus()
-            if not seleccionado:
+            if not self.encargo_seleccionado_id:
                 messagebox.showwarning("Advertencia", "Seleccione un encargo para actualizar")
                 return
                 
-            item = self.tree.item(seleccionado)
-            encargo_id = item['values'][0]
-            
+            # Validar campos
+            if not all([self.entries[field].get().strip() for field in ['nombre_conductor', 'apellido_conductor', 'patente', 'producto']]):
+                messagebox.showwarning("Advertencia", "Complete todos los campos obligatorios")
+                return
+                
+            # Preparar datos
             datos = {
-                'id': encargo_id,
+                'id': self.encargo_seleccionado_id,
                 'nombre_conductor': self.entries['nombre_conductor'].get().strip(),
                 'apellido_conductor': self.entries['apellido_conductor'].get().strip(),
                 'patente': self.entries['patente'].get().strip().upper(),
                 'fecha_reparto': self.entries['fecha_reparto'].get().strip(),
                 'producto': self.entries['producto'].get().strip(),
-                'cantidad': self.entries['cantidad'].get().strip(),
+                'cantidad': int(self.entries['cantidad'].get()),
                 'repartiendo': self.repartiendo_var.get()
             }
             
-            # Validaciones
-            campos_obligatorios = ['nombre_conductor', 'apellido_conductor', 'patente', 'producto']
-            for campo in campos_obligatorios:
-                if not datos[campo]:
-                    messagebox.showwarning("Advertencia", f"El campo {campo.replace('_', ' ')} es obligatorio")
-                    return
-
-            try:
-                datetime.strptime(datos['fecha_reparto'], '%Y-%m-%d')
-            except ValueError:
-                messagebox.showwarning("Advertencia", "Formato de fecha inválido. Use YYYY-MM-DD")
-                return
-
-            try:
-                cantidad = int(datos['cantidad'])
-                if cantidad <= 0:
-                    raise ValueError
-            except ValueError:
-                messagebox.showwarning("Advertencia", "La cantidad debe ser un número entero positivo")
-                return
-
-            command = ActualizarEncargoCommand(self.conexion, datos)
-            self.command_manager.execute(command)
+            # Actualizar en la base de datos
+            if self.actualizar_encargo_en_db(datos):
+                messagebox.showinfo("Éxito", "Encargo actualizado correctamente")
+                self.cargar_encargos()
+                self.limpiar_campos()
+            else:
+                messagebox.showerror("Error", "No se pudo actualizar el encargo")
+                
+        except ValueError as ve:
+            messagebox.showerror("Error", f"Datos inválidos: {str(ve)}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al actualizar: {str(e)}")
             
-            messagebox.showinfo("Éxito", "Encargo actualizado correctamente")
-            self.cargar_encargos()
+    def actualizar_encargo_en_db(self, datos):
+        """Actualiza un encargo en la base de datos"""
+        conn = None
+        try:
+            conn = DatabaseConnector.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("""
+                UPDATE encargos SET
+                    nombre_conductor = %s,
+                    apellido_conductor = %s,
+                    patente = %s,
+                    fecha_reparto = %s,
+                    producto = %s,
+                    cantidad = %s,
+                    repartiendo = %s
+                WHERE id = %s
+            """, (
+                datos['nombre_conductor'],
+                datos['apellido_conductor'],
+                datos['patente'],
+                datos['fecha_reparto'],
+                datos['producto'],
+                datos['cantidad'],
+                datos['repartiendo'],
+                datos['id']
+            ))
+            
+            conn.commit()
+            return cursor.rowcount > 0  # Retorna True si se actualizó alguna fila
             
         except Exception as e:
-            messagebox.showerror("Error", f"Error al actualizar el encargo: {str(e)}")
-
+            print(f"Error al actualizar en DB: {e}")
+            return False
+        finally:
+            if conn and conn.is_connected():
+                cursor.close()
+                conn.close()
+        
+    def actualizar_tabla(self):
+        """Actualiza la tabla con los datos más recientes de la base de datos"""
+        try:
+            # Limpiar tabla existente
+            for item in self.tree.get_children():
+                self.tree.delete(item)
+            
+            # Obtener datos actualizados
+            from infrastructure.repositories.repositorio_encargos import obtener_todos_encargos
+            encargos = obtener_todos_encargos()
+            
+            # Insertar nuevos datos
+            for encargo in encargos:
+                self.tree.insert("", "end", values=(
+                    encargo['id'],
+                    f"{encargo['nombre_conductor']} {encargo['apellido_conductor']}",
+                    encargo['patente'],
+                    encargo['fecha_reparto'].strftime('%Y-%m-%d') if encargo['fecha_reparto'] else '',
+                    encargo['producto'],
+                    encargo['cantidad'],
+                    "Sí" if encargo['repartiendo'] else "No"
+                ))
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo actualizar la tabla:\n{str(e)}")
+        
     def eliminar_encargo(self):
         try:
+            # Verificar selección
             seleccionado = self.tree.focus()
             if not seleccionado:
-                messagebox.showwarning("Advertencia", "Seleccione un encargo para eliminar")
+                messagebox.showwarning("Advertencia", "Por favor seleccione un encargo para eliminar")
                 return
-                
+
+            # Obtener ID del encargo seleccionado
             item = self.tree.item(seleccionado)
             encargo_id = item['values'][0]
             
+            # Confirmar eliminación
             if not messagebox.askyesno("Confirmar", "¿Está seguro de eliminar este encargo?"):
                 return
-                
-            command = EliminarEncargoCommand(self.conexion, {'id': encargo_id})
-            self.command_manager.execute(command)
+
+            # Eliminar de la base de datos
+            if self.eliminar_encargo_de_db(encargo_id):
+                messagebox.showinfo("Éxito", "Encargo eliminado correctamente")
+                self.limpiar_campos()
+                self.cargar_encargos()  # Refrescar la tabla
+            else:
+                messagebox.showerror("Error", "No se pudo eliminar el encargo")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al eliminar el encargo:\n{str(e)}")
             
-            messagebox.showinfo("Éxito", "Encargo eliminado correctamente")
-            self.limpiar_campos()
-            self.cargar_encargos()
+    def eliminar_encargo_de_db(self, encargo_id):
+        """Elimina un encargo de la base de datos"""
+        conn = None
+        try:
+            conn = DatabaseConnector.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute("DELETE FROM encargos WHERE id = %s", (encargo_id,))
+            conn.commit()
+            return cursor.rowcount > 0  # Retorna True si se eliminó alguna fila
             
         except Exception as e:
-            messagebox.showerror("Error", f"Error al eliminar el encargo: {str(e)}")
+            print(f"Error al eliminar de DB: {e}")
+            return False
+        finally:
+            if conn and conn.is_connected():
+                cursor.close()
+                conn.close()
 
     def limpiar_campos(self):
+        """Limpia todos los campos y restablece los colores"""
         for entry in self.entries.values():
             entry.delete(0, tk.END)
+            entry.config(background='white')  # Restablecer color
+        
         self.repartiendo_var.set(True)
+        self.encargo_seleccionado_id = None
         self.tree.selection_remove(self.tree.selection())
 
     def cargar_encargos(self):
         try:
-            # Limpiar treeview
             for item in self.tree.get_children():
                 self.tree.delete(item)
                 
-            # Obtener encargos de la base de datos
-            encargos = obtener_todos_encargos(self.conexion)
+            encargos = obtener_todos_encargos()  # Usar el nuevo nombre
             
-            # Insertar datos en el treeview
+            # Insertar nuevos datos
             for encargo in encargos:
-                conductor = f"{encargo['nombre_conductor']} {encargo['apellido_conductor']}"
-                en_reparto = "Sí" if encargo['repartiendo'] else "No"
                 self.tree.insert("", "end", values=(
                     encargo['id'],
-                    conductor,
+                    f"{encargo['nombre_conductor']} {encargo['apellido_conductor']}",
                     encargo['patente'],
-                    encargo['fecha_reparto'],
+                    encargo['fecha_reparto'].strftime('%Y-%m-%d') if encargo['fecha_reparto'] else '',
                     encargo['producto'],
                     encargo['cantidad'],
-                    en_reparto
+                    "Sí" if encargo['repartiendo'] else "No"
                 ))
         except Exception as e:
-            messagebox.showerror("Error", f"Error al cargar encargos: {str(e)}")
+            messagebox.showerror("Error", f"No se pudo cargar los encargos:\n{str(e)}")
 
-    def seleccionar_encargo(self, event):
+def seleccionar_encargo(self, event):
+    """Autocompleta el formulario al seleccionar un encargo de la tabla"""
+    try:
+        # Obtener el item seleccionado
         seleccionado = self.tree.focus()
-        if seleccionado:
-            item = self.tree.item(seleccionado)
-            valores = item['values']
+        if not seleccionado:
+            return
             
-            # Limpiar campos primero
-            self.limpiar_campos()
-            
-            # Rellenar campos con los valores seleccionados
-            nombres = valores[1].split()
-            self.entries['nombre_conductor'].insert(0, nombres[0] if nombres else "")
-            self.entries['apellido_conductor'].insert(0, nombres[1] if len(nombres) > 1 else "")
-            self.entries['patente'].insert(0, valores[2])
-            self.entries['fecha_reparto'].insert(0, valores[3])
-            self.entries['producto'].insert(0, valores[4])
-            self.entries['cantidad'].insert(0, valores[5])
-            self.repartiendo_var.set(valores[6] == "Sí")
+        item = self.tree.item(seleccionado)
+        valores = item['values']
+        
+        # Guardar el ID del encargo seleccionado
+        self.encargo_seleccionado_id = valores[0]
+        
+        # Limpiar los campos antes de autocompletar
+        self.limpiar_campos()
+        
+        # Extraer nombres (asumiendo formato "Nombre Apellido")
+        nombre_completo = valores[1].split()
+        nombre = nombre_completo[0] if len(nombre_completo) > 0 else ""
+        apellido = nombre_completo[1] if len(nombre_completo) > 1 else ""
+        
+        # Autocompletar los campos del formulario
+        self.entries['nombre_conductor'].insert(0, nombre)
+        self.entries['apellido_conductor'].insert(0, apellido)
+        self.entries['patente'].insert(0, valores[2])
+        self.entries['fecha_reparto'].insert(0, valores[3])
+        self.entries['producto'].insert(0, valores[4])
+        self.entries['cantidad'].insert(0, valores[5])
+        
+        # Establecer el estado de "En reparto"
+        self.repartiendo_var.set(valores[6] == "Sí")
+        
+        # Cambiar color de fondo para indicar selección
+        for entry in self.entries.values():
+            entry.config(background='#F0F8FF')  # Color azul claro
+        
+    except Exception as e:
+        messagebox.showerror("Error", f"Error al cargar datos del encargo:\n{str(e)}")

@@ -1,4 +1,3 @@
-# infrastructure/repositories/repositorio_encargos.py
 from infrastructure.config.database import DatabaseConnector
 from mysql.connector import Error
 
