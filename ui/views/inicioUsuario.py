@@ -1,4 +1,3 @@
-# 📍 Archivo: mi_aplicacion/ui/views/inicio_usuario.py
 
 import customtkinter as ctk
 from tkinter import PhotoImage
@@ -14,8 +13,8 @@ from PIL import Image, ImageTk
 from ui.assets.util_imagenes import leer_imagen
 
 
-usuario_mailtrap = '9f453e283c7f28'
-clave_mailtrap = '464fcc2ab6eb18'
+usuario_mailtrap = '02c5d9a1b22d6b'
+clave_mailtrap = 'e354b8255143ee'
 servidor_smtp = 'sandbox.smtp.mailtrap.io'
 puerto_smtp = 2525
 
@@ -38,7 +37,9 @@ class IniciarSesionCommand(Comando):
             cuerpo_mensaje['To'] = self.correo
 
             conexion = smtplib.SMTP(servidor_smtp, puerto_smtp)
+            conexion.starttls() 
             conexion.login(usuario_mailtrap, clave_mailtrap)
+
             conexion.sendmail(cuerpo_mensaje['From'], [cuerpo_mensaje['To']], cuerpo_mensaje.as_string())
             conexion.quit()
 

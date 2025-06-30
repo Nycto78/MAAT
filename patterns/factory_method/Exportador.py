@@ -1,4 +1,3 @@
-# 📍 Archivo: mi_aplicacion/patterns/factory/exportador.py
 
 from abc import ABC, abstractmethod
 import matplotlib.pyplot as plt

@@ -1,7 +1,11 @@
 import tkinter as tk
 from tkinter import font
 from PIL import Image, ImageTk
+import sys
 import os
+
+# Esto asegura que se puedan importar módulos como infrastructure, ui, etc.
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from infrastructure.config.colores import (
     COLOR_BARRA_SUPERIOR,
@@ -17,7 +21,7 @@ from ui.views.inventario_pruebas import FormularioInventario
 from ui.views.notificaciones import Notificaciones
 from ui.views.ui_encargos import InterfazEncargos
 class FormularioMaestroDesign(tk.Tk):
-
+     
     def __init__(self):
         super().__init__()
 

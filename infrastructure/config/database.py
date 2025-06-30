@@ -1,33 +1,53 @@
-# 📍 Archivo: mi_aplicacion/infrastructure/config/database.py
-
 import mysql.connector
-
 from mysql.connector import connect, Error
 from infrastructure.config.db_config import DB_CONFIG
-# Puedes mover esto a un archivo separado si quieres
-
 
 class DatabaseConnector:
-    @staticmethod
-    def get_connection():
+    _instancia = None
+
+    def __new__(cls):
+        if cls._instancia is None:
+            cls._instancia = super().__new__(cls)
+            cls._instancia._inicializar_conexion()
+        return cls._instancia
+
+    def _inicializar_conexion(self):
         try:
-            conn = connect(**DB_CONFIG)
+            self.conn = connect(**DB_CONFIG)
+            self.cursor = self.conn.cursor(dictionary=True)
             print("✅ Conexión a MySQL establecida correctamente.")
-            return conn
         except Error as e:
             print(f"❌ Error de conexión: {e}")
-            return None
-    @staticmethod
-    def verificar_estructura():
+            self.conn = None
+            self.cursor = None
+
+    def obtener_cursor(self):
+        return self.cursor
+
+    def commit(self):
+        if self.conn:
+            self.conn.commit()
+
+    def cerrar(self):
+        if self.conn:
+            self.cursor.close()
+            self.conn.close()
+            DatabaseConnector._instancia = None
+    def close(self):
+        if self.conn and self.conn.is_connected():
+            self.cursor.close()
+            self.conn.close()
+            DatabaseConnector._instancia = None
+
+    def verificar_estructura(self):
         try:
-            conn = mysql.connector.connect(
+            temp_conn = mysql.connector.connect(
                 host=DB_CONFIG["host"],
                 user=DB_CONFIG["user"],
                 password=DB_CONFIG["password"],
                 port=DB_CONFIG["port"]
             )
-
-            cursor = conn.cursor()
+            cursor = temp_conn.cursor()
             cursor.execute("CREATE DATABASE IF NOT EXISTS productos_1")
             cursor.execute("USE productos_1")
 
@@ -50,6 +70,6 @@ class DatabaseConnector:
             print(f"❌ Error al verificar estructura: {e}")
             return False
         finally:
-            if conn.is_connected():
+            if temp_conn.is_connected():
                 cursor.close()
-                conn.close()
+                temp_conn.close()
