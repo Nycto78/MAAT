@@ -3,6 +3,10 @@ from tkinter import font
 from PIL import Image, ImageTk
 import sys
 import os
+import sys
+import io
+
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 # Esto asegura que se puedan importar módulos como infrastructure, ui, etc.
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
